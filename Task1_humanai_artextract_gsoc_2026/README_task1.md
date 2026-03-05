@@ -1,17 +1,15 @@
-# Task 1 — WikiArt Classification
+# Task 1: WikiArt Classification
 ## Style, Genre, and Artist Recognition with CNN + BiLSTM + Attention
 
----
 
 ## What This Task Does
 
 Given a painting image, the model predicts three things at once: what artistic style the painting belongs to (e.g. Impressionism, Baroque), what genre it is (e.g. portrait, landscape, still life), and who painted it. These are three separate classification problems, each trained independently on the same base architecture.
 
----
 
 ## Dataset
 
-**Source:** WikiArt — a large collection of fine art images  
+**Source:** WikiArt: a large collection of fine art images  
 **Kaggle paths:**
 - Images: `/kaggle/input/datasets/steubk/wikiart`
 - CSVs: `/kaggle/input/datasets/siddinfinity/wikidatescsv`
@@ -26,7 +24,6 @@ The dataset comes with pre-defined train and val CSV files. Since there is no se
 
 There is no leakage between train and val/test splits for artist and genre. Style has 8 images that appear in both train and style splits, which is negligible across 80,675 images.
 
----
 
 ## EDA Findings
 
@@ -55,9 +52,9 @@ All images were sampled from the style training set (800 images):
 
 Average pixel values were computed per style class. Darker styles like High Renaissance and Baroque have mean pixel values below 0.35 across all channels. Lighter styles like Impressionism and Naive Art sit above 0.5. This color signal alone partially separates styles and is part of what the model learns in early convolutional layers.
 
-### Cross-task Overlap
+### Cross task Overlap
 
-A large portion of images appear in multiple task splits, which supports future multi-task learning:
+A large portion of images appear in multiple task splits, which supports future multi task learning:
 
 | Pair | Shared images |
 |------|--------------|
@@ -66,7 +63,6 @@ A large portion of images appear in multiple task splits, which supports future 
 | Genre and Style | 44,870 |
 | All three | 11,274 |
 
----
 
 ## Model Architecture
 
@@ -98,7 +94,7 @@ The reason to use a sequence model here is that art style is often about composi
 
 ### Step 3: Bidirectional LSTM
 
-A 2-layer BiLSTM processes the 49-step sequence:
+A 2 layer BiLSTM processes the 49 step sequence:
 
 ```
 Input:  (B, 49, 512)
@@ -108,7 +104,7 @@ Output: (B, 49, 512)   -- 256 forward + 256 backward
 
 The bidirectional design means each position is informed by context from both the left and right of the sequence, which is appropriate since spatial position in a painting has no natural left-to-right order.
 
-### Step 4: Self-Attention
+### Step 4: Self Attention
 
 A learned attention mechanism assigns a scalar weight to each of the 49 sequence positions:
 
@@ -118,7 +114,7 @@ weights = softmax(scores)                    -> (B, 49)
 context = sum(lstm_output * weights)         -> (B, 512)
 ```
 
-This produces a single 512-dimensional context vector that is a weighted combination of all spatial positions. Positions that are more discriminative for the predicted class get higher weights. The attention map can be visualized as a heatmap over the original image to see where the model is looking.
+This produces a single 512 dimensional context vector that is a weighted combination of all spatial positions. Positions that are more discriminative for the predicted class get higher weights. The attention map can be visualized as a heatmap over the original image to see where the model is looking.
 
 ### Step 5: Classification Head
 
@@ -134,7 +130,6 @@ context: (B, 512)
 
 **Total parameters: 14,915,652**
 
----
 
 ## Training
 
@@ -142,10 +137,10 @@ context: (B, 512)
 
 Training uses a two-phase strategy to avoid overwriting pretrained ImageNet weights too early.
 
-**Phase 1 — 5 epochs, backbone frozen:**  
+**Phase 1: 5 epochs, backbone frozen:**  
 Only the channel reducer, BiLSTM, attention, and classifier head are trained. The EfficientNet backbone weights are frozen. This lets the new components stabilize before touching the backbone. Learning rate: 3e-4.
 
-**Phase 2 — 10 epochs, backbone partially unfrozen:**  
+**Phase 2: 10 epochs, backbone partially unfrozen:**  
 The last 3 blocks of EfficientNet are unfrozen. Fine-tuning with a lower learning rate of 5e-5 allows the CNN to adapt its learned features toward art classification. The first blocks stay frozen because they learn general low-level features (edges, textures) that are useful across all domains.
 
 | Phase | Trainable params |
@@ -172,15 +167,10 @@ The last 3 blocks of EfficientNet are unfrozen. Fine-tuning with a lower learnin
 
 Validation and test use center crop only, no augmentation.
 
-### NaN Loss
-
-A single NaN validation loss occurred at P1 E04 for style and P1 E05 for genre. This is caused by numerical overflow in float16 with extreme class weights (up to 30x). The issue was isolated to the loss metric — accuracy and F1 continued computing correctly and checkpointing was unaffected. All final results are valid.
-
----
 
 ## Validation Results
 
-Best validation macro-F1 per task (from the best checkpoint saved during training):
+Best validation macro F1 per task (from the best checkpoint saved during training):
 
 | Task | Best Val F1 | Best Val Acc |
 |------|-------------|--------------|
@@ -190,11 +180,11 @@ Best validation macro-F1 per task (from the best checkpoint saved during trainin
 
 ### Training Curve Observations
 
-For all three tasks, validation loss decreases consistently across both phases. Phase 2 shows a clear jump when the backbone is unfrozen — this is most visible for style, where F1 goes from 0.392 at the end of Phase 1 to 0.522 at the end of Phase 2. Validation accuracy consistently stays above training accuracy in early epochs, which indicates the model is not overfitting.
+For all three tasks, validation loss decreases consistently across both phases. Phase 2 shows a clear jump when the backbone is unfrozen, this is most visible for style, where F1 goes from 0.392 at the end of Phase 1 to 0.522 at the end of Phase 2. Validation accuracy consistently stays above training accuracy in early epochs, which indicates the model is not overfitting.
 
 ### Hardest Classes per Task
 
-**Style — 5 hardest classes (val F1):**
+**Style 5 hardest classes (val F1):**
 
 | Class | F1 |
 |-------|----|
@@ -206,7 +196,7 @@ For all three tasks, validation loss decreases consistently across both phases. 
 
 New Realism is the hardest because it strongly overlaps visually with contemporary photography and Realism. Fauvism and Post-Impressionism are frequently confused with each other and with Impressionism because they share loose brushwork and bright colors.
 
-**Genre — 5 hardest classes (val F1):**
+**Genre  5 hardest classes (val F1):**
 
 | Class | F1 |
 |-------|----|
@@ -218,7 +208,7 @@ New Realism is the hardest because it strongly overlaps visually with contempora
 
 Illustration and sketch_and_study are hard because they represent media rather than content — an illustration can depict any subject. Genre painting (scenes of everyday life) visually overlaps with portrait, landscape, and religious painting.
 
-**Artist — 5 hardest classes (val F1):**
+**Artist  5 hardest classes (val F1):**
 
 | Class | F1 |
 |-------|----|
@@ -230,7 +220,6 @@ Illustration and sketch_and_study are hard because they represent media rather t
 
 Salvador Dali is the hardest artist to classify. His style spans Surrealism, Realism, and abstract work — there is no single visual signature. Picasso is similarly hard because his output spans Cubism, his Blue and Rose periods, and later figurative work that looks unlike his most famous paintings.
 
----
 
 ## Final Test Results
 
@@ -295,7 +284,7 @@ The lowest performers are styles that occupy visual middle ground between neighb
 | sketch_and_study | 0.51 | 0.75 | 0.60 | 588 |
 | still_life | 0.73 | 0.88 | 0.80 | 417 |
 
-Abstract_painting (F1 0.87) and landscape (F1 0.84) are the easiest genres. Portrait (F1 0.82) and still_life (F1 0.80) are also strong. Genre_painting is the hardest because it depicts everyday scenes that visually resemble landscapes, portraits, and cityscapes simultaneously — the category is defined by social content, not visual form.
+Abstract_painting (F1 0.87) and landscape (F1 0.84) are the easiest genres. Portrait (F1 0.82) and still_life (F1 0.80) are also strong. Genre_painting is the hardest because it depicts everyday scenes that visually resemble landscapes, portraits, and cityscapes simultaneously the category is defined by social content, not visual form.
 
 ### Artist Classification (23 classes)
 
@@ -325,9 +314,8 @@ Abstract_painting (F1 0.87) and landscape (F1 0.84) are the easiest genres. Port
 | Salvador_Dali | 0.44 | 0.39 | 0.42 | 71 |
 | Vincent_van_Gogh | 0.74 | 0.86 | 0.80 | 284 |
 
-Ivan_Aivazovsky (F1 0.92) is the easiest artist to identify — he painted almost exclusively seascapes with a recognizable luminous sky treatment. Gustave_Dore (F1 0.91) is highly distinctive due to his monochrome engraving style. Salvador_Dali (F1 0.42) is the hardest because his work spans wildly different visual styles across his career.
+Ivan_Aivazovsky (F1 0.92) is the easiest artist to identify, he painted almost exclusively seascapes with a recognizable luminous sky treatment. Gustave_Dore (F1 0.91) is highly distinctive due to his monochrome engraving style. Salvador_Dali (F1 0.42) is the hardest because his work spans wildly different visual styles across his career.
 
----
 
 ## Attention Map Analysis
 
@@ -341,17 +329,15 @@ Observations from the visualizations:
 - For Impressionist paintings, attention was more distributed across the canvas, which makes sense since Impressionism is identified by texture across the entire surface rather than localized features.
 - Misclassified examples showed attention on ambiguous regions. A Northern_Renaissance painting was predicted as Early_Renaissance with confidence 0.31 — the low confidence correctly signals uncertainty.
 
----
 
 ## Outlier Analysis
 
 The notebook identifies two types of interesting examples after test evaluation:
 
-**High-confidence wrong predictions** are paintings the model got wrong but was very sure about. Examples from the style task include a Cubism painting classified as Analytical_Cubism with confidence 1.000, a Post_Impressionism painting classified as Contemporary_Realism with confidence 0.993, and a Cubism painting classified as Synthetic_Cubism with confidence 0.996. These are not really model failures — they are cases where the visual boundary between classes is genuinely unclear. Analytical and Synthetic Cubism are sub-movements of Cubism, and Post-Impressionism and Realism share many surface properties.
+**High-confidence wrong predictions** are paintings the model got wrong but was very sure about. Examples from the style task include a Cubism painting classified as Analytical_Cubism with confidence 1.000, a Post_Impressionism painting classified as Contemporary_Realism with confidence 0.993, and a Cubism painting classified as Synthetic_Cubism with confidence 0.996. These are not really model failures, they are cases where the visual boundary between classes is genuinely unclear. Analytical and Synthetic Cubism are sub-movements of Cubism, and Post-Impressionism and Realism share many surface properties.
 
-**Low-confidence correct predictions** are paintings the model got right but was uncertain about. These are typically works that sit at stylistic boundaries — a High_Renaissance painting classified correctly at confidence 0.148, and a Post_Impressionism painting at confidence 0.163. These are valuable for understanding where style categories blur in practice.
+**Low confidence correct predictions** are paintings the model got right but was uncertain about. These are typically works that sit at stylistic boundaries. A High_Renaissance painting classified correctly at confidence 0.148, and a Post_Impressionism painting at confidence 0.163. These are valuable for understanding where style categories blur in practice.
 
----
 
 ## Saved Outputs
 
@@ -381,7 +367,6 @@ The notebook identifies two types of interesting examples after test evaluation:
 | 09_outliers_*_boundary.png | Low-confidence correct predictions |
 | 10_test_confusion_*.png | Final test confusion matrices |
 
----
 
 ## Possible Improvements
 
@@ -395,7 +380,6 @@ The notebook identifies two types of interesting examples after test evaluation:
 
 **Cross-task feature transfer:** The artist and genre models both reach higher accuracy than style. The intermediate feature representations from these tasks could be used to warm-start or regularize the style model, since style often correlates with artist and time period.
 
----
 
 ## Requirements
 
@@ -412,4 +396,4 @@ opencv-python
 tqdm
 ```
 
-GPU is required for reasonable training time. Each task takes approximately 15 epochs on a Tesla P100, with style taking the longest due to dataset size (about 4 hours total across all three tasks).
+GPU is required for reasonable training time. Each task takes approximately 15 epochs on a Tesla P100, with style taking the longest due to dataset size (about 8 hours total across all three tasks).
