@@ -1,13 +1,11 @@
-# Task 2 — Painting Similarity Search
+# Task 2: Painting Similarity Search
 ## National Gallery of Art Open Data Program
 
----
 
 ## Abstract
 
-This task explores image similarity search across the National Gallery of Art painting collection. Given a query painting, the system retrieves the most visually similar works from the gallery. The approach uses dual deep feature extraction — a convolutional backbone for local texture and composition, and a self-supervised Vision Transformer for semantic style — combined with a fast cosine similarity index. The system operates on 3,544 paintings spanning 1240 to 2021 and achieves a mean average precision of 0.4817 using art style as ground truth, representing a significant improvement over the VGG16/ResNet50 baseline from the reference tutorial.
+This task explores image similarity search across the National Gallery of Art painting collection. Given a query painting, the system retrieves the most visually similar works from the gallery. The approach uses dual deep feature extraction, a convolutional backbone for local texture and composition, and a self supervised Vision Transformer for semantic style, combined with a fast cosine similarity index. The system operates on 3,544 paintings spanning 1240 to 2021 and achieves a mean average precision of 0.4817 using art style as ground truth, representing a significant improvement over the VGG16/ResNet50 baseline from the reference tutorial.
 
----
 
 ## Dataset
 
@@ -27,7 +25,6 @@ The dataset is a relational collection of CSV files. The key tables used in this
 
 **Important schema note:** `published_images.csv` does not contain an `objectid` column. The foreign key linking images to artworks is `depictstmsobjectid`.
 
----
 
 ## EDA Findings
 
@@ -45,7 +42,7 @@ The dataset is a relational collection of CSV files. The key tables used in this
 
 ### Art Styles Distribution (ground truth for evaluation)
 
-The `visualbrowserstyle` field in `objects_terms.csv` provides clean categorical style labels. These are used as ground truth for Precision@K evaluation — two paintings are considered relevant if they share the same style.
+The `visualbrowserstyle` field in `objects_terms.csv` provides clean categorical style labels. These are used as ground truth for Precision@K evaluation, two paintings are considered relevant if they share the same style.
 
 | Style | Count |
 |-------|-------|
@@ -64,7 +61,7 @@ The `visualbrowserstyle` field in `objects_terms.csv` provides clean categorical
 
 ### Image Properties
 
-Full-resolution originals in the NGA collection are very high quality. Thumbnails (200px) are served via the IIIF API and are sufficient for feature extraction.
+Full resolution originals in the NGA collection are very high quality. Thumbnails (200px) are served via the IIIF API and are sufficient for feature extraction.
 
 | Property | Value |
 |----------|-------|
@@ -82,7 +79,6 @@ Full-resolution originals in the NGA collection are very high quality. Thumbnail
 
 **Portrait subset correction:** The tutorial used `element == 'painted surface'` in `objects_dimensions.csv` to identify portraits, which incorrectly matched 98.9% of all paintings (the field describes a physical property, not content). The correct approach is to filter `objects_terms` by portrait-related terms (portrait, figure, bust, head, self-portrait), which identifies 206 paintings (5.4%) as figurative works.
 
----
 
 ## Approach
 
@@ -101,11 +97,11 @@ Full-resolution originals in the NGA collection are very high quality. Thumbnail
 
 Two models are combined to capture complementary aspects of visual similarity:
 
-**EfficientNet-B3** (1536-d): A convolutional network pretrained on ImageNet. The final global average pool output captures local texture, brushstroke patterns, color distributions, and spatial composition. Well-suited to discriminating between paintings that differ in surface appearance.
+**EfficientNet B3** (1536-d): A convolutional network pretrained on ImageNet. The final global average pool output captures local texture, brushstroke patterns, color distributions, and spatial composition. Well-suited to discriminating between paintings that differ in surface appearance.
 
-**DINO ViT-S/8** (384-d): A Vision Transformer trained with self-supervised learning using the DINO objective. The CLS token embedding captures semantic and structural properties — object parts, pose, and style — without color bias. DINO patch attention has been shown to naturally segment foreground objects in paintings even without fine-tuning.
+**DINO ViT-S/8** (384 d): A Vision Transformer trained with self supervised learning using the DINO objective. The CLS token embedding captures semantic and structural properties, object parts, pose, and style without color bias. DINO patch attention has been shown to naturally segment foreground objects in paintings even without fine-tuning.
 
-The two embeddings are concatenated to form a 1,920-dimensional vector, then L2-normalized so that cosine similarity equals inner product.
+The two embeddings are concatenated to form a 1,920-dimensional vector, then L2 normalized so that cosine similarity equals inner product.
 
 ```
 Image (200px thumbnail, center-cropped to 224x224)
@@ -123,9 +119,8 @@ Image (200px thumbnail, center-cropped to 224x224)
 
 ### Similarity Index
 
-FAISS `IndexFlatIP` performs exact inner product search on unit-normalized vectors, equivalent to exact cosine similarity. For the 3,544-painting collection this is fast enough for real-time querying. For larger collections (100k+), `IndexIVFFlat` with approximate nearest neighbor search would be appropriate.
+FAISS `IndexFlatIP` performs exact inner product search on unit-normalized vectors, equivalent to exact cosine similarity. For the 3,544-painting collection this is fast enough for real time querying. For larger collections (100k+), `IndexIVFFlat` with approximate nearest neighbor search would be appropriate.
 
----
 
 ## Results
 
@@ -159,7 +154,7 @@ FAISS `IndexFlatIP` performs exact inner product search on unit-normalized vecto
 | Post-Impressionist | 0.189 | 9 |
 | Rococo | 0.160 | 5 |
 
-Abstract Expressionist retrieves most accurately — likely because its distinct non-representational visual features (flat color fields, gestural marks) differ sharply from other styles. Realist and Post-Impressionist score lower because their surface appearance overlaps with neighboring styles.
+Abstract Expressionist retrieves most accurately, likely because its distinct non-representational visual features (flat color fields, gestural marks) differ sharply from other styles. Realist and Post Impressionist score lower because their surface appearance overlaps with neighboring styles.
 
 ### Comparison with Tutorial Baseline
 
@@ -170,13 +165,12 @@ Abstract Expressionist retrieves most accurately — likely because its distinct
 | Precision@10 | Not reported | 0.3765 |
 | mAP | Not reported | 0.4817 |
 
-SSIM improved by 63% and RMSE decreased by 11% compared to the reported tutorial numbers. The introduction of Precision@K and mAP provides a semantically meaningful evaluation that pixel-level metrics cannot capture.
+SSIM improved by 63% and RMSE decreased by 11% compared to the reported tutorial numbers. The introduction of Precision@K and mAP provides a semantically meaningful evaluation that pixel level metrics cannot capture.
 
 ### t-SNE Embedding Visualization
 
 A t-SNE projection of 2,331 embeddings (paintings with style labels) was computed via PCA reduction to 50 dimensions (explaining 59.1% of variance) followed by t-SNE with perplexity 35. The resulting 2D map shows visible clustering by art style, particularly for Abstract Expressionist, Gothic, and Renaissance works. Neighboring clusters (Baroque and Renaissance, Realist and Romantic) reflect genuine stylistic continuity in art history.
 
----
 
 ## Implementation
 
@@ -219,7 +213,7 @@ torch.hub.load('facebookresearch/dino:main', 'dino_vits8')
 |------|-------------|
 | paintings_clean.csv | Full metadata for 3,821 paintings with local paths |
 | portraits_subset.csv | 206 figurative/portrait paintings identified via term tags |
-| features.npy | L2-normalized embedding matrix, shape (3544, 1920) |
+| features.npy | L2 normalized embedding matrix, shape (3544, 1920) |
 | object_ids.npy | Corresponding objectid array |
 | painting_similarity.index | FAISS IndexFlatIP binary index |
 | 01_dataset_overview.png | 6-panel distribution charts |
@@ -235,21 +229,19 @@ torch.hub.load('facebookresearch/dino:main', 'dino_vits8')
 | 11_tsne_by_style.png | t-SNE embedding colored by art style |
 | 12_tsne_by_nationality.png | t-SNE embedding colored by nationality |
 
----
 
 ## Possible Improvements
 
-**Fine-tuning on art data:** Both EfficientNet and DINO are pretrained on natural images. Fine-tuning on a labeled art dataset (e.g. WikiArt, which is used in Task 1) would likely improve retrieval quality, particularly for styles with low P@10 such as Rococo and Post-Impressionist.
+**Fine tuning on art data:** Both EfficientNet and DINO are pretrained on natural images. Fine tuning on a labeled art dataset (e.g. WikiArt, which is used in Task 1) would likely improve retrieval quality, particularly for styles with low P@10 such as Rococo and Post-Impressionist.
 
-**Higher resolution inputs:** Thumbnails are 200px. Requesting the IIIF API at 400px or 600px would provide richer texture information, particularly for detail-sensitive styles.
+**Higher resolution inputs:** Thumbnails are 200px. Requesting the IIIF API at 400px or 600px would provide richer texture information, particularly for detail sensitive styles.
 
-**Cross-task features:** Task 1 trains a classifier on WikiArt style labels. The penultimate layer of that model could serve as an art-domain-specific feature extractor for Task 2, replacing or augmenting the ImageNet-pretrained models.
+**Cross task features:** Task 1 trains a classifier on WikiArt style labels. The penultimate layer of that model could serve as an art domain specific feature extractor for Task 2, replacing or augmenting the ImageNet-pretrained models.
 
-**Approximate search scaling:** For the full 101,854-image NGA collection (all object types), replacing `IndexFlatIP` with `IndexIVFFlat` or `IndexHNSWFlat` would allow sub-millisecond queries.
+**Approximate search scaling:** For the full 101,854 image NGA collection (all object types), replacing `IndexFlatIP` with `IndexIVFFlat` or `IndexHNSWFlat` would allow sub-millisecond queries.
 
 **Multispectral and infrared data:** As noted in the tutorial, NGA has published some multispectral imaging data. Incorporating non-visible-spectrum features could reveal compositional underdrawings and enable a hidden image discovery mode, which the tutorial identifies as a promising research direction.
 
----
 
 ## Citation
 
